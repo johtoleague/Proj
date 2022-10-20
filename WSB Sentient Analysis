@@ -1,0 +1,213 @@
+"""
+GOAL: Scrape the last 5 days of posts in Wall Street Bets, and store the top 5 talked about stocks in a dictionary, along with the sentiment analysis for each of the stocks. Finally graph those stocks on a bar chart.
+
+"""
+
+
+# import required libraries
+import requests
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+import datetime
+
+
+def main(previous_days=5, graph=True):
+	"""
+	The main function for the program.
+
+	Parameters:
+	previous_days(int): How many days back from today should the program look to scrape posts from
+	graph(bool): Whether or not to graph the stocks at the end
+
+	Returns:
+	None
+	"""
+	# scrape the Wall Street Bets website for new posts
+	wsb_url = 'https://www.reddit.com/r/wallstreetbets/'
+	wsb_html = requests.get(wsb_url).text
+	wsb_soup = BeautifulSoup(wsb_html, 'html.parser')
+
+	# scraped_posts is a dictionary with the stock ticker as the key, and a list as the value
+	# the list is the post titles and the sentiment analysis of the titles
+	scraped_posts = blog_scrape(wsb_soup, previous_days)
+
+	# if the user wants to graph the stocks, graph them
+	if graph:
+		graph_stocks(scraped_posts)
+
+	print('\n')
+
+	# print the dictionary
+	for stock in scraped_posts:
+		print(f'{stock}:', scraped_posts[stock])
+
+
+def blog_scrape(wsb_soup, previous_days):
+	"""
+	Scrape the Wall Street Bets website for new posts for the past 5 days
+
+	Parameters:
+	wsb_soup(BeautifulSoup object): The beautiful soup object from the Wall Street Bets website
+	previous_days(int): How many days back from today should the program look to scrape posts from
+
+	Returns:
+	scraped_posts(dictionary): a dictionary with the stock ticker as the key, and a list as the value
+	the list is the post titles and the sentiment analysis of the titles
+	"""
+	# find all the posts on the Wall Street Bets website, going back 5 days
+	posts = wsb_soup.find_all('div', class_='Post')
+
+	# initialize an empty dictionary
+	scraped_posts = {}
+
+	# iterate through each post
+	for post in posts:
+		# find the title of the post
+		title = post.find('div', class_='Title').text
+
+		# get the current day
+		current_day = datetime.date.today()
+
+		# print the current date
+		print(current_day)
+
+		# print the post title
+		print(title)
+
+		# if the post is from the past 5 days
+		if current_day - datetime.timedelta(days=previous_days) <= datetime.date.fromisoformat(post.find('div', class_='PostMeta').find('div', class_='PostMeta__date').find('time')['datetime'][:10]):
+			# split the title into a list of words
+			title_words = title.split()
+
+			# iterate through each word in the title
+			for word in title_words:
+				# if the word is a stock ticker
+				if word[0] == '$':
+					# if the stock ticker is not in the dictionary
+					if word not in scraped_posts:
+						# add the stock ticker to the dictionary
+						scraped_posts[word] = []
+
+					# add the title to the dictionary
+					scraped_posts[word].append(title)
+
+					# add the sentiment analysis of the title to the dictionary
+					scraped_posts[word].append(sentiment_analysis(title))
+
+					# print the sentiment analysis of the title
+					print(sentiment_analysis(title))
+
+					# print a blank line
+					print('\n')
+
+					# break out of the for loop
+					break
+
+	# return the dictionary
+	return scraped_posts
+
+
+def sentiment_analysis(title):
+	"""
+	Perform sentiment analysis on the title of the post
+
+	Parameters:
+	title(string): The title of the post
+
+	Returns:
+	sentiment(string): The sentiment of the title
+	"""
+	# split the title into a list of words
+	title_words = title.split()
+
+	# initialize the sentiment to be positive
+	sentiment = 'positive'
+
+	# iterate through each word in the title
+	for word in title_words:
+		# if the word is a stock ticker
+		if word[0] == '$':
+			# split the word into a list of characters
+			word_characters = list(word)
+
+			# iterate through each character in the word
+			for character in word_characters:
+				# if the character is a negative word
+				if character == '-':
+					# set the sentiment to be negative
+					sentiment = 'negative'
+
+					# break out of the for loop
+					break
+
+			# break out of the for loop
+			break
+
+	# return the sentiment
+	return sentiment
+
+
+def graph_stocks(scraped_posts):
+	"""
+	Graph the stocks on a bar chart
+
+	Parameters:
+	scraped_posts(dictionary): a dictionary with the stock ticker as the key, and a list as the value
+	the list is the post titles and the sentiment analysis of the titles
+
+	Returns:
+	None
+	"""
+	# initialize the lists for the positive and negative sentiment
+	positive_sentiment = []
+	negative_sentiment = []
+
+	# iterate through each stock in the dictionary
+	for stock in scraped_posts:
+		# initialize the positive and negative sentiment to be 0
+		positive_sentiment_count = 0
+		negative_sentiment_count = 0
+
+		# iterate through each title in the dictionary
+		for title in scraped_posts[stock]:
+			# if the sentiment of the title is positive
+			if title[1] == 'positive':
+				# increment the positive sentiment
+				positive_sentiment_count += 1
+
+			# if the sentiment of the title is negative
+			elif title[1] == 'negative':
+				# increment the negative sentiment
+				negative_sentiment_count += 1
+
+		# add the positive sentiment to the list
+		positive_sentiment.append(positive_sentiment_count)
+
+		# add the negative sentiment to the list
+		negative_sentiment.append(negative_sentiment_count)
+
+	# create the bar chart
+	plt.bar(scraped_posts.keys(), positive_sentiment, color='green')
+	plt.bar(scraped_posts.keys(), negative_sentiment, color='red')
+
+	# set the x-axis to be the stocks
+	plt.xticks(scraped_posts.keys(), rotation='vertical')
+
+	# set the y-axis to be the sentiment
+	plt.yticks(range(0, max(positive_sentiment) + 1))
+
+	# set the title of the graph
+	plt.title('Sentiment of Wall Street Bets Posts')
+
+	# set the x-axis label
+	plt.xlabel('Stock')
+
+	# set the y-axis label
+	plt.ylabel('Sentiment')
+
+	# show the graph
+	plt.show()
+
+
+# call the main function
+main()
